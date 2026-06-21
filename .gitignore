@@ -1,0 +1,34 @@
+# Dependencies
+node_modules/
+
+# Compiled output
+out/
+dist/
+build/
+*.tsbuildinfo
+
+# Test and coverage output
+.vscode-test/
+coverage/
+
+# Packaged VS Code extensions
+*.vsix
+
+# Environment files
+.env
+.env.*
+!.env.example
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Editor and OS files
+.idea/
+*.code-workspace
+.DS_Store
+Thumbs.db
+
