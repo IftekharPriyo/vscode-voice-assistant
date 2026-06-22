@@ -2,18 +2,18 @@ import * as vscode from 'vscode';
 
 import { COMMAND_IDS } from '../config/commandIds';
 import { WhisperSpeechRecognitionService } from '../services/WhisperSpeechRecognitionService';
-import { VoiceAssistantPanel } from '../webview/VoiceAssistantPanel';
+import { VoiceAssistantViewProvider } from '../webview/VoiceAssistantViewProvider';
 
 export function registerCommands(
-  panel: VoiceAssistantPanel,
+  viewProvider: VoiceAssistantViewProvider,
   speechRecognition: WhisperSpeechRecognitionService,
 ): vscode.Disposable[] {
   return [
-    vscode.commands.registerCommand(COMMAND_IDS.openPanel, () => {
-      panel.open();
+    vscode.commands.registerCommand(COMMAND_IDS.openPanel, async () => {
+      await viewProvider.open();
     }),
-    vscode.commands.registerCommand(COMMAND_IDS.startRecording, () => {
-      panel.open();
+    vscode.commands.registerCommand(COMMAND_IDS.startRecording, async () => {
+      await viewProvider.open();
       speechRecognition.start();
     }),
     vscode.commands.registerCommand(COMMAND_IDS.stopRecording, () => {

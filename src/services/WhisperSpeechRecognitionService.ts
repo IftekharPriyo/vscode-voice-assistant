@@ -9,6 +9,7 @@ import { WhisperRuntimeManager, type WhisperRuntime } from './WhisperRuntimeMana
 const READY_STATE: SpeechRecognitionState = {
   status: 'Ready',
   transcript: '',
+  audioLevel: 0,
   isError: false,
   canStart: true,
   canStop: false,
@@ -24,6 +25,7 @@ export class WhisperSpeechRecognitionService implements vscode.Disposable {
   private errorOutput = '';
   private recordingPath: string | undefined;
   private starting = false;
+  private smoothedAudioLevel = 0;
 
   public readonly onDidChangeState = this.stateEmitter.event;
 
@@ -44,9 +46,11 @@ export class WhisperSpeechRecognitionService implements vscode.Disposable {
     }
 
     this.starting = true;
+    this.smoothedAudioLevel = 0;
     this.updateState({
       status: 'Preparing local speech recognition...',
       transcript: '',
+      audioLevel: 0,
       isError: false,
       canStart: false,
       canStop: false,
@@ -67,6 +71,7 @@ export class WhisperSpeechRecognitionService implements vscode.Disposable {
 
     this.updateState({
       status: 'Stopping recording...',
+      audioLevel: 0,
       isError: false,
       canStart: false,
       canStop: false,
@@ -89,9 +94,7 @@ export class WhisperSpeechRecognitionService implements vscode.Disposable {
       });
       const recordingsDirectory = path.join(this.storagePath, 'recordings');
       await mkdir(recordingsDirectory, { recursive: true });
-      // The legacy Windows MCI recorder requires an 8.3-style basename even
-      // though the containing directory may use a normal long Windows path.
-      const recordingName = `r${Date.now().toString(36).slice(-7)}.wav`;
+      const recordingName = `recording-${Date.now()}.wav`;
       this.recordingPath = path.join(recordingsDirectory, recordingName);
       this.launchRecorder(runtime, this.recordingPath);
     } catch (error) {
@@ -152,6 +155,15 @@ export class WhisperSpeechRecognitionService implements vscode.Disposable {
           canStart: false,
           canStop: true,
         });
+      } else if (line.startsWith('LEVEL:')) {
+        const rawLevel = Number(line.slice('LEVEL:'.length));
+        if (Number.isFinite(rawLevel)) {
+          const targetLevel = normalizeAudioLevel(rawLevel);
+          const smoothing = targetLevel > this.smoothedAudioLevel ? 0.65 : 0.25;
+          this.smoothedAudioLevel +=
+            (targetLevel - this.smoothedAudioLevel) * smoothing;
+          this.updateState({ audioLevel: this.smoothedAudioLevel });
+        }
       } else if (line.startsWith('COMPLETE:')) {
         const recordingPath = decodeMessage(line.slice('COMPLETE:'.length));
         const recorder = this.recorder;
@@ -167,6 +179,7 @@ export class WhisperSpeechRecognitionService implements vscode.Disposable {
   private async transcribe(runtime: WhisperRuntime, recordingPath: string): Promise<void> {
     this.updateState({
       status: 'Transcribing locally with Whisper...',
+      audioLevel: 0,
       isError: false,
       canStart: false,
       canStop: false,
@@ -214,6 +227,7 @@ export class WhisperSpeechRecognitionService implements vscode.Disposable {
       this.updateState({
         status: 'Transcription complete.',
         transcript: transcript || 'No speech recognized.',
+        audioLevel: 0,
         isError: false,
         canStart: true,
         canStop: false,
@@ -243,6 +257,7 @@ export class WhisperSpeechRecognitionService implements vscode.Disposable {
     }
     this.updateState({
       status: message,
+      audioLevel: 0,
       isError: true,
       canStart: true,
       canStop: false,
@@ -265,4 +280,12 @@ function decodeMessage(encodedMessage: string): string {
 
 function toErrorMessage(error: unknown): string {
   return error instanceof Error ? error.message : 'Local speech recognition failed.';
+}
+
+function normalizeAudioLevel(rawLevel: number): number {
+  // The recorder reports RMS amplitude from signed 16-bit PCM. Remove a small
+  // noise floor, then use a square-root curve so normal speech remains lively
+  // without making quiet room noise dominate the animation.
+  const adjustedLevel = Math.max(0, Math.abs(rawLevel) - 12);
+  return Math.min(1, Math.sqrt(adjustedLevel / 1800));
 }
