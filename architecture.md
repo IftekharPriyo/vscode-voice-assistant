@@ -1,194 +1,267 @@
 # Architecture
 
-## Overview
+## Status
 
-The VS Code extension acts as the client application.
+This document distinguishes the implemented raw voice-to-text slice from the
+future speech-cleanup architecture.
 
-Its job is to capture user input and communicate with the backend API.
+Today, raw transcription runs locally in the extension environment. Backend
+communication, editor insertion, AI cleanup, and Ollama integration have not
+been implemented.
 
-All AI processing happens on the backend.
+## Implemented Architecture
 
----
+```mermaid
+flowchart TD
+    U[User] --> UI[Secondary Side Bar Webview]
+    UI --> C[VS Code Commands]
+    C --> S[Whisper Speech Recognition Service]
+    S --> R[Windows WinMM PCM Recorder]
+    R -->|RMS amplitude| S
+    S -->|audio level state| UI
+    R -->|temporary WAV| S
+    S --> M[Whisper Runtime Manager]
+    M -->|first use| D[Verified Runtime and Model Download]
+    M --> W[Local whisper.cpp CLI]
+    W -->|raw transcript| S
+    S --> UI
+    S --> X[Delete Temporary WAV]
+```
 
-## High-Level Flow
+## Runtime Sequence
 
-User Speaks
-↓
-VS Code Extension
-↓
-Backend API
-↓
-AI Cleanup Service
-↓
-Response Returned
-↓
-Insert Into Editor
+### Start Recording
 
----
+1. The user opens the Voice Assistant view from the status bar or command palette.
+2. The Start Recording command invokes `WhisperSpeechRecognitionService`.
+3. `WhisperRuntimeManager` ensures the pinned runtime and `base.en` model exist.
+4. Missing files are downloaded, checksum-verified, and stored in extension global storage.
+5. A hidden PowerShell helper starts native WinMM PCM capture from the default microphone.
+6. The helper writes PCM buffers to a temporary WAV and emits live RMS amplitude values.
+7. The service forwards amplitude state to the webview, which animates the voice rings.
 
-## System Architecture
+### Stop and Transcribe
 
-┌─────────────────────┐
-│ User │
-└──────────┬──────────┘
-│
-▼
-┌─────────────────────┐
-│ VS Code Extension │
-└──────────┬──────────┘
-│
-│ HTTP Request
-▼
-┌─────────────────────┐
-│ Backend API │
-└──────────┬──────────┘
-│
-▼
-┌─────────────────────┐
-│ AI Processing │
-│ (Ollama/LLM) │
-└──────────┬──────────┘
-│
-▼
-┌─────────────────────┐
-│ Cleaned Text │
-└─────────────────────┘
+1. The user presses the pause control, which invokes the Stop Recording command.
+2. The recorder finalizes the WAV header and returns the recording path.
+3. The extension launches the local `whisper.cpp` CLI with the `base.en` model.
+4. Whisper writes the raw transcript to a temporary text file.
+5. The extension reads the transcript and posts it to the webview.
+6. Temporary audio and transcript files are deleted.
 
----
+## Current Component Structure
 
-## Extension Responsibilities
+```text
+src/
+├── commands/
+│   └── registerCommands.ts
+├── config/
+│   ├── commandIds.ts
+│   ├── viewIds.ts
+│   └── whisperRuntime.ts
+├── services/
+│   ├── SpeechRecognitionState.ts
+│   ├── WhisperRuntimeManager.ts
+│   └── WhisperSpeechRecognitionService.ts
+├── ui/
+│   └── statusBar.ts
+├── utils/
+│   ├── downloadFile.ts
+│   ├── fileHash.ts
+│   └── nonce.ts
+├── webview/
+│   ├── VoiceAssistantViewProvider.ts
+│   └── webviewContent.ts
+└── extension.ts
+
+resources/
+├── microphone.svg
+└── windowsAudioRecorder.ps1
+```
+
+## Component Responsibilities
+
+### Extension Entry Point
+
+`extension.ts` creates services, registers the Secondary Side Bar webview,
+connects state updates, and adds disposables to the extension context.
 
 ### Commands
 
-Register VS Code commands.
+The command layer registers:
 
-Examples:
+- Voice Assistant: Open Panel
+- Voice Assistant: Start Recording
+- Voice Assistant: Stop Recording
 
-- Start Recording
-- Stop Recording
-- Clean Prompt
+Commands coordinate the UI and speech service but contain no audio or
+transcription implementation.
 
----
+### Webview Layer
 
-### Audio Layer
+The webview is responsible for:
 
-Responsible for:
+- Rendering status and raw transcript text
+- Sending Start and Stop actions to the extension host
+- Rendering microphone and pause states
+- Animating concentric rings from normalized audio-level state
 
-- Capturing microphone input
-- Preparing request payloads
+It does not access the microphone directly because VS Code webviews do not
+provide reliable `getUserMedia` permission.
 
-Not responsible for:
+### Speech Recognition Service
 
-- Speech cleanup
-- AI processing
+`WhisperSpeechRecognitionService` owns the recording/transcription lifecycle:
 
----
+- Start and Stop state transitions
+- Native recorder process management
+- RMS amplitude normalization and smoothing
+- Whisper CLI process management
+- Transcript loading
+- Temporary-file cleanup
+- User-facing errors
 
-### API Layer
+### Runtime Manager
 
-Responsible for:
+`WhisperRuntimeManager` owns local speech-runtime provisioning:
 
-- Calling backend endpoints
-- Handling responses
-- Handling failures
+- Platform validation
+- Runtime and model download
+- Download progress reporting
+- Checksum verification
+- Archive extraction
+- Stable global-storage paths
 
----
+It currently supports Windows x64 only.
 
-### Editor Layer
+### Native Windows Recorder
 
-Responsible for:
+`windowsAudioRecorder.ps1` compiles a small in-process C# WinMM host that:
 
-- Inserting text
-- Replacing selections
-- Clipboard support
+- Captures 16 kHz, mono, 16-bit PCM from the default microphone
+- Writes a valid WAV file
+- Computes RMS amplitude from each captured PCM buffer
+- Streams amplitude values to the extension over stdout
+- Uses a small line-based process protocol
 
----
+Protocol messages:
 
-## Component Structure
+```text
+READY
+LEVEL:<rms-value>
+COMPLETE:<base64-wav-path>
+ERROR:<base64-error-message>
+```
 
-src/
-├── commands/
-│ └── startVoiceInput.ts
-│
-├── services/
-│ └── voiceAssistantApi.ts
-│
-├── config/
-│ └── extensionConfig.ts
-│
-├── utils/
-│ └── editor.ts
-│
-└── extension.ts
+## Storage and Data Lifecycle
 
----
+Persistent files in VS Code extension global storage:
 
-## API Contract
+- Pinned `whisper.cpp` runtime
+- English `base.en` model
+
+Ephemeral files:
+
+- Recorded WAV
+- Whisper transcript output
+
+Ephemeral files are deleted after success or failure. Raw audio is never sent
+over the network.
+
+## Architectural Boundary
+
+The extension remains thin with one deliberate exception: raw speech-to-text
+runs locally to provide a private, backend-free recording experience.
+
+The extension may:
+
+- Capture microphone audio
+- Compute UI-only audio levels
+- Run local raw transcription
+- Display raw transcripts
+- Communicate with a future backend
+- Insert future results into VS Code
+
+The extension must not:
+
+- Clean or rewrite transcripts
+- Construct LLM prompts for cleanup
+- Run Ollama or another cleanup LLM
+- Know which cleanup model or provider the backend uses
+- Store user prompts or transcripts permanently
+
+## Future Cleanup Architecture
+
+```mermaid
+flowchart TD
+    A[Local Raw Transcript] --> B[Backend API]
+    B --> C[Cleanup Service]
+    C --> D[Ollama or Other LLM Provider]
+    D --> C
+    C -->|cleaned developer text| B
+    B --> E[VS Code Extension]
+    E --> F[Preview, Clipboard, or Editor Insertion]
+```
+
+Ollama is a future backend provider, not an extension dependency. This keeps the
+extension backend-agnostic and allows the cleanup implementation to change
+without changing microphone capture or VS Code integration.
+
+## Future API Contract
+
+This contract is planned and is not implemented in the current slice.
 
 Request:
 
+```http
 POST /api/voice/clean
+Content-Type: application/json
+```
 
-Payload:
-
+```json
 {
-"text": "uhh create like a route for users"
+  "text": "uhh create like a route for users"
 }
+```
 
 Response:
 
+```json
 {
-"text": "Create a GET /users route."
+  "text": "Create a GET /users route."
 }
+```
 
----
+## Future Platform Providers
+
+Cross-platform audio capture should use a common provider boundary:
+
+```text
+SpeechRecognitionService
+├── Windows native PCM provider (implemented)
+├── macOS native provider (planned)
+└── Linux native provider (planned)
+```
+
+The UI and transcription state model should not depend on a specific native
+audio implementation.
 
 ## Design Principles
 
-### Thin Frontend
+- Keep command, UI, runtime, and native-audio responsibilities separate.
+- Keep cleanup logic outside the extension.
+- Prefer local processing for raw audio and explicit network boundaries.
+- Verify downloaded executable and model assets before use.
+- Delete temporary user audio as soon as processing finishes.
+- Add abstractions only when they represent a real platform or service boundary.
 
-The extension should remain lightweight.
+## Current Non-Goals
 
-Business logic belongs to the backend.
-
----
-
-### Single Responsibility
-
-Each module should have one responsibility.
-
-Examples:
-
-voiceAssistantApi.ts
-
-Only API communication.
-
-editor.ts
-
-Only editor interactions.
-
----
-
-### Backend Agnostic
-
-The extension should not know:
-
-- Which LLM is used
-- Which provider is used
-- How prompts are constructed
-
-The backend may change without requiring frontend changes.
-
----
-
-## Non-Goals
-
-The extension will not:
-
-- Run local LLMs
-- Store user data
-- Manage accounts
-- Handle billing
-- Perform AI reasoning
-
-Those concerns belong elsewhere.
+- Backend communication
+- AI cleanup
+- Ollama integration
+- Authentication and user accounts
+- Database storage
+- Settings UI
+- Billing, analytics, or telemetry
+- Audio upload
