@@ -1,0 +1,43 @@
+{
+  "name": "vscode-voice-assistant",
+  "displayName": "VS Code Voice Assistant",
+  "description": "A lightweight voice assistant interface for VS Code.",
+  "version": "0.0.1",
+  "publisher": "local-development",
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "activationEvents": [
+    "onStartupFinished"
+  ],
+  "main": "./out/extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "voiceAssistant.openPanel",
+        "title": "Voice Assistant: Open Panel"
+      },
+      {
+        "command": "voiceAssistant.startRecording",
+        "title": "Voice Assistant: Start Recording"
+      },
+      {
+        "command": "voiceAssistant.stopRecording",
+        "title": "Voice Assistant: Stop Recording"
+      }
+    ]
+  },
+  "scripts": {
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./",
+    "vscode:prepublish": "npm run compile"
+  },
+  "devDependencies": {
+    "@types/node": "^20.17.0",
+    "@types/vscode": "^1.85.0",
+    "typescript": "^5.9.3"
+  }
+}

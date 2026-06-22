@@ -74,6 +74,22 @@ Launch the Extension Development Host:
 Press F5 in VS Code
 ```
 
+## Raw Voice-to-Text Prototype
+
+The current prototype records from the default Windows microphone and transcribes
+the resulting audio locally with `whisper.cpp`.
+
+On first use, the extension automatically downloads:
+
+- A pinned `whisper.cpp` Windows runtime
+- The English `base.en` model (approximately 148 MB)
+
+Downloads are checksum-verified and stored in VS Code's extension global storage.
+Audio is processed locally, deleted after transcription, and is never uploaded.
+
+Windows x64 is currently supported. Other platforms show a clear unsupported
+platform message until their native microphone helpers are packaged.
+
 ## Project Goal
 
 The extension should remain lightweight.
