@@ -1,6 +1,7 @@
 import * as vscode from 'vscode';
 
 import { COMMAND_IDS } from '../config/commandIds';
+import { VIEW_IDS } from '../config/viewIds';
 import type { SpeechRecognitionState } from '../services/SpeechRecognitionState';
 import { getWebviewContent } from './webviewContent';
 
@@ -8,38 +9,30 @@ type WebviewMessage =
   | { readonly type: 'ready' }
   | { readonly type: 'command'; readonly command: 'start' | 'stop' };
 
-export class VoiceAssistantPanel implements vscode.Disposable {
-  private panel: vscode.WebviewPanel | undefined;
+export class VoiceAssistantViewProvider
+  implements vscode.WebviewViewProvider, vscode.Disposable
+{
+  private view: vscode.WebviewView | undefined;
   private webviewReady = false;
   private state: SpeechRecognitionState = {
     status: 'Ready',
     transcript: '',
+    audioLevel: 0,
     isError: false,
     canStart: true,
     canStop: false,
   };
   private readonly disposables: vscode.Disposable[] = [];
 
-  public open(): void {
-    if (this.panel) {
-      this.panel.reveal(vscode.ViewColumn.One);
-      return;
-    }
-
-    const panel = vscode.window.createWebviewPanel(
-      'voiceAssistant.panel',
-      'VS Code Voice Assistant',
-      vscode.ViewColumn.One,
-      { enableScripts: true },
-    );
-
-    this.panel = panel;
+  public resolveWebviewView(webviewView: vscode.WebviewView): void {
+    this.view = webviewView;
     this.webviewReady = false;
-    panel.webview.html = getWebviewContent();
+    webviewView.webview.options = { enableScripts: true };
+    webviewView.webview.html = getWebviewContent();
 
-    panel.webview.onDidReceiveMessage(
+    webviewView.webview.onDidReceiveMessage(
       async (message: unknown) => {
-        const webviewMessage = this.parseMessage(message);
+        const webviewMessage = parseMessage(message);
         if (!webviewMessage) {
           return;
         }
@@ -60,54 +53,58 @@ export class VoiceAssistantPanel implements vscode.Disposable {
       this.disposables,
     );
 
-    panel.onDidDispose(
+    webviewView.onDidDispose(
       () => {
-        this.panel = undefined;
-        this.webviewReady = false;
+        if (this.view === webviewView) {
+          this.view = undefined;
+          this.webviewReady = false;
+        }
       },
       undefined,
       this.disposables,
     );
   }
 
+  public async open(): Promise<void> {
+    await vscode.commands.executeCommand(`${VIEW_IDS.sidebar}.focus`);
+  }
+
   public showState(state: SpeechRecognitionState): void {
     this.state = state;
-    this.open();
     void this.postState();
   }
 
   public dispose(): void {
-    this.panel?.dispose();
     for (const disposable of this.disposables) {
       disposable.dispose();
     }
   }
 
   private async postState(): Promise<void> {
-    if (!this.panel || !this.webviewReady) {
+    if (!this.view || !this.webviewReady) {
       return;
     }
 
-    await this.panel.webview.postMessage({ type: 'state', ...this.state });
+    await this.view.webview.postMessage({ type: 'state', ...this.state });
   }
+}
 
-  private parseMessage(message: unknown): WebviewMessage | undefined {
-    if (typeof message !== 'object' || message === null || !('type' in message)) {
-      return undefined;
-    }
-
-    const candidate = message as { type: unknown; command?: unknown };
-    if (candidate.type === 'ready') {
-      return { type: 'ready' };
-    }
-
-    if (
-      candidate.type === 'command' &&
-      (candidate.command === 'start' || candidate.command === 'stop')
-    ) {
-      return { type: 'command', command: candidate.command };
-    }
-
+function parseMessage(message: unknown): WebviewMessage | undefined {
+  if (typeof message !== 'object' || message === null || !('type' in message)) {
     return undefined;
   }
+
+  const candidate = message as { type: unknown; command?: unknown };
+  if (candidate.type === 'ready') {
+    return { type: 'ready' };
+  }
+
+  if (
+    candidate.type === 'command' &&
+    (candidate.command === 'start' || candidate.command === 'stop')
+  ) {
+    return { type: 'command', command: candidate.command };
+  }
+
+  return undefined;
 }

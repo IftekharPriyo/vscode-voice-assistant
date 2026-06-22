@@ -77,7 +77,8 @@ Press F5 in VS Code
 ## Raw Voice-to-Text Prototype
 
 The current prototype records from the default Windows microphone and transcribes
-the resulting audio locally with `whisper.cpp`.
+the resulting audio locally with `whisper.cpp`. The controls and raw transcript
+appear in a compact view in VS Code's right-side Secondary Side Bar.
 
 On first use, the extension automatically downloads:
 

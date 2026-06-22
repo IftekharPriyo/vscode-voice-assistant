@@ -5,7 +5,7 @@
   "version": "0.0.1",
   "publisher": "local-development",
   "engines": {
-    "vscode": "^1.85.0"
+    "vscode": "^1.96.2"
   },
   "categories": [
     "Other"
@@ -15,6 +15,24 @@
   ],
   "main": "./out/extension.js",
   "contributes": {
+    "viewsContainers": {
+      "secondarySidebar": [
+        {
+          "id": "voiceAssistantSecondaryViewContainer",
+          "title": "Voice Assistant",
+          "icon": "resources/microphone.svg"
+        }
+      ]
+    },
+    "views": {
+      "voiceAssistantSecondaryViewContainer": [
+        {
+          "type": "webview",
+          "id": "voiceAssistant.view",
+          "name": "Voice Assistant"
+        }
+      ]
+    },
     "commands": [
       {
         "command": "voiceAssistant.openPanel",
@@ -22,22 +40,25 @@
       },
       {
         "command": "voiceAssistant.startRecording",
-        "title": "Voice Assistant: Start Recording"
+        "title": "Voice Assistant: Start Recording",
+        "icon": "$(mic)"
       },
       {
         "command": "voiceAssistant.stopRecording",
-        "title": "Voice Assistant: Stop Recording"
+        "title": "Voice Assistant: Stop Recording",
+        "icon": "$(debug-stop)"
       }
     ]
   },
   "scripts": {
-    "compile": "tsc -p ./",
-    "watch": "tsc -watch -p ./",
+    "clean": "node -e \"require('node:fs').rmSync('out', { recursive: true, force: true })\"",
+    "compile": "npm run clean && tsc -p ./",
+    "watch": "npm run clean && tsc -watch -p ./",
     "vscode:prepublish": "npm run compile"
   },
   "devDependencies": {
     "@types/node": "^20.17.0",
-    "@types/vscode": "^1.85.0",
+    "@types/vscode": "^1.96.2",
     "typescript": "^5.9.3"
   }
 }
