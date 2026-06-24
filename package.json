@@ -47,6 +47,16 @@
         "command": "voiceAssistant.stopRecording",
         "title": "Voice Assistant: Stop Recording",
         "icon": "$(debug-stop)"
+      },
+      {
+        "command": "voiceAssistant.resetTranscript",
+        "title": "Voice Assistant: Reset Transcript",
+        "icon": "$(clear-all)"
+      },
+      {
+        "command": "voiceAssistant.copyTranscript",
+        "title": "Voice Assistant: Copy Transcript",
+        "icon": "$(copy)"
       }
     ]
   },
