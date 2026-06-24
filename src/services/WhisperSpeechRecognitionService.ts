@@ -49,7 +49,6 @@ export class WhisperSpeechRecognitionService implements vscode.Disposable {
     this.smoothedAudioLevel = 0;
     this.updateState({
       status: 'Preparing local speech recognition...',
-      transcript: '',
       audioLevel: 0,
       isError: false,
       canStart: false,
@@ -77,6 +76,10 @@ export class WhisperSpeechRecognitionService implements vscode.Disposable {
       canStop: false,
     });
     this.recorder.stdin.write('STOP\n');
+  }
+
+  public resetTranscript(): void {
+    this.updateState({ transcript: '' });
   }
 
   public dispose(): void {
@@ -224,9 +227,13 @@ export class WhisperSpeechRecognitionService implements vscode.Disposable {
       });
 
       const transcript = (await readFile(`${outputPath}.txt`, 'utf8')).trim();
+      const previousTranscript = this.state.transcript.trim();
+      const accumulatedTranscript = transcript
+        ? [previousTranscript, transcript].filter(Boolean).join('\n\n')
+        : previousTranscript;
       this.updateState({
-        status: 'Transcription complete.',
-        transcript: transcript || 'No speech recognized.',
+        status: transcript ? 'Transcription complete.' : 'No speech recognized.',
+        transcript: accumulatedTranscript,
         audioLevel: 0,
         isError: false,
         canStart: true,

@@ -43,7 +43,9 @@ Implemented features:
 - Live audio-reactive rings driven by actual microphone RMS amplitude
 - Native PCM microphone capture through Windows WinMM
 - Local transcription with `whisper.cpp`
-- Raw transcript display inside the Voice Assistant view
+- Raw transcript accumulation across multiple recordings
+- A compact reset control for clearing accumulated transcript text
+- A copy-to-clipboard control for the full accumulated transcript
 - Automatic runtime and model provisioning on first use
 - Checksum verification for downloaded runtime and model files
 - Automatic deletion of temporary WAV files after transcription

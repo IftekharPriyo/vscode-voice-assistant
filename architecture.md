@@ -103,6 +103,8 @@ The webview is responsible for:
 
 - Rendering status and raw transcript text
 - Sending Start and Stop actions to the extension host
+- Sending transcript reset actions to the extension host
+- Sending copy-to-clipboard actions to the extension host
 - Rendering microphone and pause states
 - Animating concentric rings from normalized audio-level state
 
@@ -118,6 +120,7 @@ provide reliable `getUserMedia` permission.
 - RMS amplitude normalization and smoothing
 - Whisper CLI process management
 - Transcript loading
+- Transcript accumulation and reset
 - Temporary-file cleanup
 - User-facing errors
 
