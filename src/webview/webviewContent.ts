@@ -152,11 +152,51 @@ export function getWebviewContent(): string {
       }
     }
     .transcript h2 {
-      margin: 0 0 0.5rem;
+      margin: 0;
       color: var(--vscode-descriptionForeground);
       font-size: 0.85rem;
       font-weight: 600;
       text-transform: uppercase;
+    }
+    .transcript-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 0.5rem;
+      margin-bottom: 0.5rem;
+    }
+    .transcript-actions {
+      display: flex;
+      gap: 0.2rem;
+    }
+    .transcript-action {
+      display: inline-flex;
+      width: 1.6rem;
+      height: 1.6rem;
+      align-items: center;
+      justify-content: center;
+      padding: 0;
+      color: var(--vscode-descriptionForeground);
+      background: transparent;
+      border: 0;
+      border-radius: 3px;
+      cursor: pointer;
+    }
+    .transcript-action:hover:not(:disabled) {
+      color: var(--vscode-foreground);
+      background: var(--vscode-toolbar-hoverBackground);
+    }
+    .transcript-action:focus-visible {
+      outline: 1px solid var(--vscode-focusBorder);
+      outline-offset: 1px;
+    }
+    .transcript-action:disabled {
+      cursor: default;
+      opacity: 0.35;
+    }
+    .transcript-action svg {
+      width: 0.95rem;
+      height: 0.95rem;
     }
     #transcript {
       max-height: 14rem;
@@ -191,7 +231,22 @@ export function getWebviewContent(): string {
       <div class="status" id="status" role="status" aria-live="polite">Ready</div>
     </div>
     <section class="transcript" aria-labelledby="transcript-heading">
-      <h2 id="transcript-heading">Raw Transcript</h2>
+      <div class="transcript-header">
+        <h2 id="transcript-heading">Raw Transcript</h2>
+        <div class="transcript-actions">
+          <button class="transcript-action" id="copy-transcript" type="button" title="Copy Transcript" aria-label="Copy Transcript" disabled>
+            <svg viewBox="0 0 16 16" aria-hidden="true">
+              <rect x="5.5" y="5.5" width="7" height="7" rx="1" fill="none" stroke="currentColor" stroke-width="1.3"/>
+              <path fill="none" stroke="currentColor" stroke-width="1.3" d="M10.5 5.5v-2h-7v7h2"/>
+            </svg>
+          </button>
+          <button class="transcript-action" id="reset-transcript" type="button" title="Reset Transcript" aria-label="Reset Transcript" disabled>
+            <svg viewBox="0 0 16 16" aria-hidden="true">
+              <path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.3" d="M13 7.5A5 5 0 1 1 11.45 4L13 5.5m0-3v3h-3"/>
+            </svg>
+          </button>
+        </div>
+      </div>
       <p id="transcript" aria-live="polite">Your raw speech will appear here.</p>
     </section>
   </main>
@@ -201,13 +256,39 @@ export function getWebviewContent(): string {
     const transcriptElement = document.getElementById('transcript');
     const audioVisualizer = document.getElementById('audio-visualizer');
     const recordControl = document.getElementById('record-control');
+    const resetTranscript = document.getElementById('reset-transcript');
+    const copyTranscript = document.getElementById('copy-transcript');
     const microphoneIcon = document.getElementById('microphone-icon');
     const pauseIcon = document.getElementById('pause-icon');
     let action = 'start';
 
     recordControl.addEventListener('click', () => {
-      vscode.postMessage({ type: 'command', command: action });
+      const requestedAction = action;
+
+      if (requestedAction === 'start') {
+        action = 'stop';
+        recordControl.classList.add('recording', 'busy');
+        showRecordingIcon(true);
+        recordControl.title = 'Preparing Recording...';
+        recordControl.setAttribute('aria-label', 'Preparing Recording');
+      }
+
+      recordControl.disabled = true;
+      vscode.postMessage({ type: 'command', command: requestedAction });
     });
+
+    resetTranscript.addEventListener('click', () => {
+      vscode.postMessage({ type: 'command', command: 'reset' });
+    });
+
+    copyTranscript.addEventListener('click', () => {
+      vscode.postMessage({ type: 'command', command: 'copy' });
+    });
+
+    function showRecordingIcon(isRecording) {
+      microphoneIcon.toggleAttribute('hidden', isRecording);
+      pauseIcon.toggleAttribute('hidden', !isRecording);
+    }
 
     window.addEventListener('message', (event) => {
       if (!event.data || event.data.type !== 'state') {
@@ -241,12 +322,14 @@ export function getWebviewContent(): string {
         'aria-label',
         isRecording ? 'Stop Recording' : 'Start Recording',
       );
-      microphoneIcon.hidden = isRecording;
-      pauseIcon.hidden = !isRecording;
+      showRecordingIcon(isRecording);
 
       if (typeof event.data.transcript === 'string') {
+        const hasTranscript = event.data.transcript.trim().length > 0;
         transcriptElement.textContent =
           event.data.transcript || 'Your raw speech will appear here.';
+        copyTranscript.disabled = !hasTranscript;
+        resetTranscript.disabled = !hasTranscript;
       }
     });
 

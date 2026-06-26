@@ -19,5 +19,17 @@ export function registerCommands(
     vscode.commands.registerCommand(COMMAND_IDS.stopRecording, () => {
       speechRecognition.stop();
     }),
+    vscode.commands.registerCommand(COMMAND_IDS.resetTranscript, () => {
+      speechRecognition.resetTranscript();
+    }),
+    vscode.commands.registerCommand(COMMAND_IDS.copyTranscript, async () => {
+      const transcript = speechRecognition.currentState.transcript.trim();
+      if (!transcript) {
+        return;
+      }
+
+      await vscode.env.clipboard.writeText(transcript);
+      await vscode.window.showInformationMessage('Voice Assistant transcript copied.');
+    }),
   ];
 }

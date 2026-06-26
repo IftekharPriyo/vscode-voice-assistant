@@ -1,6 +1,9 @@
 .vscode/**
+.git/**
+.github/**
 src/**
 out/**/*.map
+*.vsix
 architecture.md
 roadmap.md
 skills.md

@@ -7,7 +7,10 @@ import { getWebviewContent } from './webviewContent';
 
 type WebviewMessage =
   | { readonly type: 'ready' }
-  | { readonly type: 'command'; readonly command: 'start' | 'stop' };
+  | {
+      readonly type: 'command';
+      readonly command: 'start' | 'stop' | 'reset' | 'copy';
+    };
 
 export class VoiceAssistantViewProvider
   implements vscode.WebviewViewProvider, vscode.Disposable
@@ -43,10 +46,12 @@ export class VoiceAssistantViewProvider
           return;
         }
 
-        const command =
-          webviewMessage.command === 'start'
-            ? COMMAND_IDS.startRecording
-            : COMMAND_IDS.stopRecording;
+        const command = {
+          start: COMMAND_IDS.startRecording,
+          stop: COMMAND_IDS.stopRecording,
+          reset: COMMAND_IDS.resetTranscript,
+          copy: COMMAND_IDS.copyTranscript,
+        }[webviewMessage.command];
         await vscode.commands.executeCommand(command);
       },
       undefined,
@@ -101,7 +106,10 @@ function parseMessage(message: unknown): WebviewMessage | undefined {
 
   if (
     candidate.type === 'command' &&
-    (candidate.command === 'start' || candidate.command === 'stop')
+    (candidate.command === 'start' ||
+      candidate.command === 'stop' ||
+      candidate.command === 'reset' ||
+      candidate.command === 'copy')
   ) {
     return { type: 'command', command: candidate.command };
   }
