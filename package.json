@@ -1,9 +1,29 @@
 {
   "name": "vscode-voice-assistant",
   "displayName": "VS Code Voice Assistant",
-  "description": "A lightweight voice assistant interface for VS Code.",
-  "version": "0.0.1",
-  "publisher": "local-development",
+  "description": "A local voice-to-text assistant for VS Code powered by whisper.cpp.",
+  "version": "0.1.0",
+  "publisher": "iftekharpriyo",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/IftekharPriyo/vscode-voice-assistant.git"
+  },
+  "bugs": {
+    "url": "https://github.com/IftekharPriyo/vscode-voice-assistant/issues"
+  },
+  "homepage": "https://github.com/IftekharPriyo/vscode-voice-assistant#readme",
+  "keywords": [
+    "voice",
+    "speech-to-text",
+    "transcription",
+    "whisper",
+    "assistant"
+  ],
+  "galleryBanner": {
+    "color": "#111827",
+    "theme": "dark"
+  },
   "engines": {
     "vscode": "^1.96.2"
   },
