@@ -7,6 +7,7 @@ out/**/*.map
 architecture.md
 roadmap.md
 skills.md
+README.md
 tsconfig.json
 package-lock.json
 .gitignore

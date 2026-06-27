@@ -3,6 +3,11 @@
 All notable changes to the VS Code Voice Assistant extension will be documented
 in this file.
 
+## 0.1.1
+
+- Added the extension's Marketplace icon.
+- Added a focused Marketplace description while preserving the project README.
+
 ## 0.1.0
 
 - Added the first working VS Code extension release.
