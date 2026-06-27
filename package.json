@@ -2,8 +2,9 @@
   "name": "vscode-voice-assistant",
   "displayName": "VS Code Voice Assistant",
   "description": "A local voice-to-text assistant for VS Code powered by whisper.cpp.",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "publisher": "iftekharpriyo",
+  "icon": "resources/icon.png",
   "license": "MIT",
   "repository": {
     "type": "git",
@@ -84,7 +85,8 @@
     "clean": "node -e \"require('node:fs').rmSync('out', { recursive: true, force: true })\"",
     "compile": "npm run clean && tsc -p ./",
     "watch": "npm run clean && tsc -watch -p ./",
-    "vscode:prepublish": "npm run compile"
+    "vscode:prepublish": "npm run compile",
+    "package:marketplace": "npx @vscode/vsce package --readme-path MARKETPLACE.md"
   },
   "devDependencies": {
     "@types/node": "^20.17.0",
