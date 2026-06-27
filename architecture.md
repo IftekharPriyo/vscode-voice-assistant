@@ -16,7 +16,9 @@ flowchart TD
     U[User] --> UI[Secondary Side Bar Webview]
     UI --> C[VS Code Commands]
     C --> S[Whisper Speech Recognition Service]
-    S --> R[Windows WinMM PCM Recorder]
+    S --> R[Platform PCM Recorder]
+    R --> RW[Windows WinMM]
+    R --> RM[macOS CoreAudio]
     R -->|RMS amplitude| S
     S -->|audio level state| UI
     R -->|temporary WAV| S
@@ -36,8 +38,11 @@ flowchart TD
 2. The Start Recording command invokes `WhisperSpeechRecognitionService`.
 3. `WhisperRuntimeManager` ensures the pinned runtime and `base.en` model exist.
 4. Missing files are downloaded, checksum-verified, and stored in extension global storage.
-5. A hidden PowerShell helper starts native WinMM PCM capture from the default microphone.
-6. The helper writes PCM buffers to a temporary WAV and emits live RMS amplitude values.
+5. The platform recorder starts PCM capture from the default microphone: WinMM
+   through the PowerShell helper on Windows, or CoreAudio through `decibri-cli`
+   on macOS.
+6. The recorder writes PCM buffers to a temporary WAV and provides live RMS
+   amplitude values to the service.
 7. The service forwards amplitude state to the webview, which animates the voice rings.
 
 ### Stop and Transcribe
@@ -135,7 +140,7 @@ provide reliable `getUserMedia` permission.
 - Archive extraction
 - Stable global-storage paths
 
-It currently supports Windows x64 only.
+It supports Windows x64 plus macOS on Apple Silicon and Intel.
 
 ### Native Windows Recorder
 
@@ -155,6 +160,17 @@ LEVEL:<rms-value>
 COMPLETE:<base64-wav-path>
 ERROR:<base64-error-message>
 ```
+
+### Native macOS Recorder
+
+On macOS, the runtime manager downloads a pinned universal build of
+`decibri-cli`. It captures the default CoreAudio input as 16 kHz mono 16-bit
+PCM. The service samples the growing WAV file to preserve live RMS-driven UI
+feedback, sends `SIGINT` to stop, and waits for a finalized WAV before starting
+local transcription.
+
+macOS controls microphone access. Permission can be managed under **System
+Settings > Privacy & Security > Microphone**.
 
 ## Storage and Data Lifecycle
 
@@ -242,7 +258,7 @@ Cross-platform audio capture should use a common provider boundary:
 ```text
 SpeechRecognitionService
 ├── Windows native PCM provider (implemented)
-├── macOS native provider (planned)
+├── macOS CoreAudio provider (implemented)
 └── Linux native provider (planned)
 ```
 

@@ -1,5 +1,5 @@
 import { spawn, type ChildProcessWithoutNullStreams } from 'node:child_process';
-import { mkdir, readFile, rm } from 'node:fs/promises';
+import { mkdir, open, readFile, rm } from 'node:fs/promises';
 import * as path from 'node:path';
 import * as vscode from 'vscode';
 
@@ -26,6 +26,8 @@ export class WhisperSpeechRecognitionService implements vscode.Disposable {
   private recordingPath: string | undefined;
   private starting = false;
   private smoothedAudioLevel = 0;
+  private macLevelTimer: NodeJS.Timeout | undefined;
+  private macLevelOffset = 44;
 
   public readonly onDidChangeState = this.stateEmitter.event;
 
@@ -75,7 +77,11 @@ export class WhisperSpeechRecognitionService implements vscode.Disposable {
       canStart: false,
       canStop: false,
     });
-    this.recorder.stdin.write('STOP\n');
+    if (process.platform === 'darwin') {
+      this.recorder.kill('SIGINT');
+    } else {
+      this.recorder.stdin.write('STOP\n');
+    }
   }
 
   public resetTranscript(): void {
@@ -87,6 +93,7 @@ export class WhisperSpeechRecognitionService implements vscode.Disposable {
     this.transcriber?.kill();
     this.recorder = undefined;
     this.transcriber = undefined;
+    this.stopMacLevelMonitor();
     this.stateEmitter.dispose();
   }
 
@@ -108,6 +115,11 @@ export class WhisperSpeechRecognitionService implements vscode.Disposable {
   }
 
   private launchRecorder(runtime: WhisperRuntime, recordingPath: string): void {
+    if (process.platform === 'darwin') {
+      this.launchMacRecorder(runtime, recordingPath);
+      return;
+    }
+
     this.outputBuffer = '';
     this.errorOutput = '';
     const recorder = spawn(
@@ -142,6 +154,109 @@ export class WhisperSpeechRecognitionService implements vscode.Disposable {
         this.fail(this.errorOutput.trim() || 'The microphone recorder stopped unexpectedly.');
       }
     });
+  }
+
+  private launchMacRecorder(runtime: WhisperRuntime, recordingPath: string): void {
+    if (!runtime.recorderPath) {
+      throw new Error('The macOS microphone recorder is unavailable.');
+    }
+
+    this.errorOutput = '';
+    const recorder = spawn(
+      runtime.recorderPath,
+      ['capture', '--output', recordingPath, '--rate', '16000', '--channels', '1', '--quiet'],
+      { windowsHide: true },
+    );
+    this.recorder = recorder;
+    recorder.stderr.setEncoding('utf8');
+    recorder.stderr.on('data', (chunk: string) => {
+      this.errorOutput += chunk;
+    });
+    recorder.on('spawn', () => {
+      this.updateState({
+        status: 'Recording...',
+        isError: false,
+        canStart: false,
+        canStop: true,
+      });
+      this.startMacLevelMonitor(recordingPath);
+    });
+    recorder.on('error', (error) => {
+      this.fail(`Unable to start the microphone: ${error.message}`);
+    });
+    recorder.on('exit', (code, signal) => {
+      if (this.recorder !== recorder) {
+        return;
+      }
+      this.recorder = undefined;
+      this.stopMacLevelMonitor();
+      // decibri finalizes the WAV after SIGINT. Some Node/macOS combinations
+      // report the terminating signal even though the recording is complete.
+      if (code === 0 || signal === 'SIGINT') {
+        void this.transcribe(runtime, recordingPath);
+      } else {
+        const detail = this.errorOutput.trim();
+        const permissionHint = /permission|denied|not authorized/i.test(detail)
+          ? ' Allow Visual Studio Code microphone access in System Settings > Privacy & Security > Microphone.'
+          : '';
+        this.fail((detail || 'The microphone recorder stopped unexpectedly.') + permissionHint);
+      }
+    });
+  }
+
+  private startMacLevelMonitor(recordingPath: string): void {
+    this.stopMacLevelMonitor();
+    this.macLevelOffset = 44;
+    let reading = false;
+    this.macLevelTimer = setInterval(() => {
+      if (reading) {
+        return;
+      }
+      reading = true;
+      void this.readMacAudioLevel(recordingPath).finally(() => {
+        reading = false;
+      });
+    }, 120);
+  }
+
+  private async readMacAudioLevel(recordingPath: string): Promise<void> {
+    let file;
+    try {
+      file = await open(recordingPath, 'r');
+      const stats = await file.stat();
+      const availableBytes = stats.size - this.macLevelOffset;
+      if (availableBytes < 2) {
+        return;
+      }
+      const bytesToRead = Math.min(availableBytes - (availableBytes % 2), 16_000);
+      const buffer = Buffer.allocUnsafe(bytesToRead);
+      const result = await file.read(buffer, 0, bytesToRead, this.macLevelOffset);
+      this.macLevelOffset += result.bytesRead;
+      let sumSquares = 0;
+      const sampleCount = Math.floor(result.bytesRead / 2);
+      for (let index = 0; index < sampleCount; index += 1) {
+        const sample = buffer.readInt16LE(index * 2);
+        sumSquares += sample * sample;
+      }
+      if (sampleCount > 0) {
+        const rms = Math.sqrt(sumSquares / sampleCount);
+        const targetLevel = normalizeAudioLevel(rms);
+        const smoothing = targetLevel > this.smoothedAudioLevel ? 0.65 : 0.25;
+        this.smoothedAudioLevel += (targetLevel - this.smoothedAudioLevel) * smoothing;
+        this.updateState({ audioLevel: this.smoothedAudioLevel });
+      }
+    } catch {
+      // The WAV may not exist until CoreAudio delivers its first buffer.
+    } finally {
+      await file?.close();
+    }
+  }
+
+  private stopMacLevelMonitor(): void {
+    if (this.macLevelTimer) {
+      clearInterval(this.macLevelTimer);
+      this.macLevelTimer = undefined;
+    }
   }
 
   private handleRecorderOutput(chunk: string, runtime: WhisperRuntime): void {
@@ -258,6 +373,7 @@ export class WhisperSpeechRecognitionService implements vscode.Disposable {
     this.transcriber = undefined;
     recorder?.kill();
     transcriber?.kill();
+    this.stopMacLevelMonitor();
     if (this.recordingPath) {
       void rm(this.recordingPath, { force: true });
       this.recordingPath = undefined;

@@ -1,14 +1,21 @@
 import { spawn } from 'node:child_process';
-import { access, mkdir, rm } from 'node:fs/promises';
+import { access, chmod, mkdir, rm } from 'node:fs/promises';
 import * as path from 'node:path';
 
-import { WHISPER_MODEL, WHISPER_RUNTIME_VERSION, WINDOWS_X64_RUNTIME } from '../config/whisperRuntime';
+import {
+  MACOS_RECORDER,
+  MACOS_WHISPER_RUNTIMES,
+  WHISPER_MODEL,
+  WHISPER_RUNTIME_VERSION,
+  WINDOWS_X64_RUNTIME,
+} from '../config/whisperRuntime';
 import { downloadFile } from '../utils/downloadFile';
 import { calculateFileHash } from '../utils/fileHash';
 
 export interface WhisperRuntime {
   readonly executablePath: string;
   readonly modelPath: string;
+  readonly recorderPath?: string;
 }
 
 type ProgressReporter = (message: string) => void;
@@ -26,21 +33,43 @@ export class WhisperRuntimeManager {
   }
 
   private async provisionRuntime(reportProgress: ProgressReporter): Promise<WhisperRuntime> {
-    if (process.platform !== 'win32' || process.arch !== 'x64') {
+    const isWindows = process.platform === 'win32' && process.arch === 'x64';
+    const isMac = process.platform === 'darwin' && (process.arch === 'arm64' || process.arch === 'x64');
+    if (!isWindows && !isMac) {
       throw new Error(
         `Local Whisper is not packaged yet for ${process.platform}-${process.arch}.`,
       );
     }
 
     await mkdir(this.storagePath, { recursive: true });
-    const runtimeDirectory = path.join(this.storagePath, 'runtime', WHISPER_RUNTIME_VERSION);
-    const executablePath = path.join(
-      runtimeDirectory,
-      WINDOWS_X64_RUNTIME.executableRelativePath,
+    const runtimeDirectory = path.join(
+      this.storagePath,
+      'runtime',
+      isWindows ? WHISPER_RUNTIME_VERSION : `macos-${MACOS_WHISPER_RUNTIMES.version}-${process.arch}`,
     );
+    const executablePath = isWindows
+      ? path.join(runtimeDirectory, WINDOWS_X64_RUNTIME.executableRelativePath)
+      : path.join(runtimeDirectory, MACOS_WHISPER_RUNTIMES.executableRelativePath);
+    let recorderPath: string | undefined;
 
     if (!(await fileExists(executablePath))) {
-      await this.installWindowsRuntime(runtimeDirectory, reportProgress);
+      if (isWindows) {
+        await this.installWindowsRuntime(runtimeDirectory, reportProgress);
+      } else {
+        await this.installMacWhisperRuntime(runtimeDirectory, reportProgress);
+      }
+    }
+
+    if (isMac) {
+      recorderPath = path.join(
+        this.storagePath,
+        'recorders',
+        `decibri-${MACOS_RECORDER.version}`,
+        MACOS_RECORDER.executableRelativePath,
+      );
+      if (!(await fileExists(recorderPath))) {
+        await this.installMacRecorder(path.dirname(recorderPath), reportProgress);
+      }
     }
 
     const modelDirectory = path.join(this.storagePath, 'models');
@@ -57,7 +86,45 @@ export class WhisperRuntimeManager {
       await this.verifyFile(modelPath, 'sha256', WHISPER_MODEL.sha256, 'Whisper model');
     }
 
-    return { executablePath, modelPath };
+    return { executablePath, modelPath, recorderPath };
+  }
+
+  private async installMacWhisperRuntime(
+    runtimeDirectory: string,
+    reportProgress: ProgressReporter,
+  ): Promise<void> {
+    const architecture = process.arch as 'arm64' | 'x64';
+    const runtime = MACOS_WHISPER_RUNTIMES[architecture];
+    await rm(runtimeDirectory, { recursive: true, force: true });
+    await mkdir(runtimeDirectory, { recursive: true });
+    const archivePath = path.join(this.storagePath, runtime.archiveName);
+    reportProgress('Downloading macOS Whisper runtime...');
+    await downloadFile(runtime.url, archivePath, (percentage) => {
+      reportProgress(`Downloading macOS Whisper runtime...${percentage === undefined ? '' : ` ${percentage}%`}`);
+    });
+    await this.verifyFile(archivePath, 'sha256', runtime.sha256, 'macOS Whisper runtime');
+    reportProgress('Installing macOS Whisper runtime...');
+    await runProcess('/usr/bin/ditto', ['-x', '-k', archivePath, runtimeDirectory]);
+    await chmod(path.join(runtimeDirectory, MACOS_WHISPER_RUNTIMES.executableRelativePath), 0o755);
+    await rm(archivePath, { force: true });
+  }
+
+  private async installMacRecorder(
+    recorderDirectory: string,
+    reportProgress: ProgressReporter,
+  ): Promise<void> {
+    await rm(recorderDirectory, { recursive: true, force: true });
+    await mkdir(recorderDirectory, { recursive: true });
+    const archivePath = path.join(this.storagePath, MACOS_RECORDER.archiveName);
+    reportProgress('Downloading macOS microphone recorder...');
+    await downloadFile(MACOS_RECORDER.url, archivePath, (percentage) => {
+      reportProgress(`Downloading macOS microphone recorder...${percentage === undefined ? '' : ` ${percentage}%`}`);
+    });
+    await this.verifyFile(archivePath, 'sha256', MACOS_RECORDER.sha256, 'macOS microphone recorder');
+    reportProgress('Installing macOS microphone recorder...');
+    await runProcess('/usr/bin/tar', ['-xzf', archivePath, '-C', recorderDirectory]);
+    await chmod(path.join(recorderDirectory, MACOS_RECORDER.executableRelativePath), 0o755);
+    await rm(archivePath, { force: true });
   }
 
   private async installWindowsRuntime(
