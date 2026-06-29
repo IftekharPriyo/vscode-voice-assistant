@@ -24,9 +24,10 @@ account, API key, backend, or audio upload is required.
 3. Select the pause button to stop recording and start transcription.
 4. Copy the transcript or continue recording to add more text.
 
-The first recording downloads the Windows `whisper.cpp` runtime and the English
-`base.en` model (approximately 148 MB). These files are verified, stored in VS
-Code's extension storage, and reused for future offline transcription.
+The first recording downloads the appropriate `whisper.cpp` runtime, a small
+macOS recorder when applicable, and the English `base.en` model (approximately
+148 MB). These files are verified, stored in VS Code's extension storage, and
+reused for future offline transcription.
 
 ## Privacy
 
@@ -36,12 +37,12 @@ Code's extension storage, and reused for future offline transcription.
 
 ## Requirements
 
-- Windows x64
+- Windows x64, or macOS on Apple Silicon/Intel
 - VS Code 1.96.2 or newer
 - A working default microphone
 - Internet access for the first-use runtime and model download
 
-macOS and Linux support is planned for future releases.
+Linux support is planned for a future release.
 
 ## Current Scope
 

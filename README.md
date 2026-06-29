@@ -33,7 +33,8 @@ The goal is to:
 
 ## Current Status
 
-The first vertical slice provides local raw voice-to-text on Windows x64.
+The current release provides local raw voice-to-text on Windows x64 and macOS
+(Apple Silicon and Intel).
 
 Implemented features:
 
@@ -41,7 +42,7 @@ Implemented features:
 - A status-bar microphone shortcut that reveals the view
 - A large recording control that switches between microphone and pause states
 - Live audio-reactive rings driven by actual microphone RMS amplitude
-- Native PCM microphone capture through Windows WinMM
+- Native microphone capture through Windows WinMM or macOS CoreAudio
 - Local transcription with `whisper.cpp`
 - Raw transcript accumulation across multiple recordings
 - A compact reset control for clearing accumulated transcript text
@@ -70,9 +71,10 @@ Temporary WAV deleted
 
 ## First-Use Download
 
-The first recording automatically downloads:
+The first recording automatically downloads the runtime for the current system:
 
-- A pinned Windows x64 `whisper.cpp` runtime
+- A pinned Windows x64 or macOS `whisper.cpp` runtime
+- A small CoreAudio recorder on macOS
 - The English `base.en` model, approximately 148 MB
 
 Downloads are stored in VS Code's extension global storage and verified against
@@ -88,12 +90,12 @@ pinned checksums. Later recordings reuse these files and work offline.
 
 ## Requirements
 
-- Windows x64
+- Windows x64, or macOS on Apple Silicon/Intel
 - VS Code 1.96.2 or newer
-- A working default Windows microphone
+- A working default system microphone
 - Internet access for the first-use runtime and model download
 
-macOS and Linux microphone helpers are planned but are not currently packaged.
+Linux microphone support is planned but is not currently packaged.
 
 ## Development
 
@@ -145,7 +147,7 @@ The following features remain future work:
 - Support Ollama or another LLM behind the backend cleanup service
 - Preview cleaned prompts
 - Insert cleaned text into the active editor or coding-agent prompt
-- Add macOS and Linux native audio providers
+- Add a Linux native audio provider
 - Add configurable language and model selection
 - Add settings, shortcuts, and stronger error recovery
 
