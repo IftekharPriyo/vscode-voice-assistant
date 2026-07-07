@@ -10,6 +10,10 @@ type WebviewMessage =
   | {
       readonly type: 'command';
       readonly command: 'start' | 'stop' | 'reset' | 'copy';
+    }
+  | {
+      readonly type: 'setSendToActiveTerminal';
+      readonly enabled: boolean;
     };
 
 export class VoiceAssistantViewProvider
@@ -24,6 +28,7 @@ export class VoiceAssistantViewProvider
     isError: false,
     canStart: true,
     canStop: false,
+    sendToActiveTerminal: false,
   };
   private readonly disposables: vscode.Disposable[] = [];
 
@@ -46,13 +51,21 @@ export class VoiceAssistantViewProvider
           return;
         }
 
-        const command = {
-          start: COMMAND_IDS.startRecording,
-          stop: COMMAND_IDS.stopRecording,
-          reset: COMMAND_IDS.resetTranscript,
-          copy: COMMAND_IDS.copyTranscript,
-        }[webviewMessage.command];
-        await vscode.commands.executeCommand(command);
+        if (webviewMessage.type === 'command') {
+          const command = {
+            start: COMMAND_IDS.startRecording,
+            stop: COMMAND_IDS.stopRecording,
+            reset: COMMAND_IDS.resetTranscript,
+            copy: COMMAND_IDS.copyTranscript,
+          }[webviewMessage.command];
+          await vscode.commands.executeCommand(command);
+          return;
+        }
+
+        await vscode.commands.executeCommand(
+          COMMAND_IDS.setSendToActiveTerminal,
+          webviewMessage.enabled,
+        );
       },
       undefined,
       this.disposables,
@@ -99,7 +112,11 @@ function parseMessage(message: unknown): WebviewMessage | undefined {
     return undefined;
   }
 
-  const candidate = message as { type: unknown; command?: unknown };
+  const candidate = message as {
+    type: unknown;
+    command?: unknown;
+    enabled?: unknown;
+  };
   if (candidate.type === 'ready') {
     return { type: 'ready' };
   }
@@ -112,6 +129,13 @@ function parseMessage(message: unknown): WebviewMessage | undefined {
       candidate.command === 'copy')
   ) {
     return { type: 'command', command: candidate.command };
+  }
+
+  if (
+    candidate.type === 'setSendToActiveTerminal' &&
+    typeof candidate.enabled === 'boolean'
+  ) {
+    return { type: 'setSendToActiveTerminal', enabled: candidate.enabled };
   }
 
   return undefined;
