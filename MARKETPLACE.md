@@ -13,6 +13,7 @@ account, API key, backend, or audio upload is required.
 - Access a compact interface in the right-side Secondary Side Bar
 - See audio-reactive feedback while speaking
 - Continue recording to append to your current transcript
+- Optionally insert the latest transcript into the active VS Code terminal
 - Copy the complete transcript to your clipboard
 - Reset the transcript with one click
 - Automatically download and verify the required runtime and model on first use
@@ -22,7 +23,13 @@ account, API key, backend, or audio upload is required.
 1. Open **Voice Assistant** from the microphone icon in the status bar.
 2. Select the large microphone button and begin speaking.
 3. Select the pause button to stop recording and start transcription.
-4. Copy the transcript or continue recording to add more text.
+4. Copy the transcript, continue recording to add more text, or enable
+   **Insert into active terminal** to place the latest transcript in your
+   current terminal input.
+
+Terminal insertion is opt-in and does not press Enter automatically. You can
+review or edit the inserted text before submitting it to Git Bash, PowerShell,
+CMD, Codex CLI, Claude CLI, or any other active terminal workflow.
 
 The first recording downloads the Windows `whisper.cpp` runtime and the English
 `base.en` model (approximately 148 MB). These files are verified, stored in VS
@@ -45,9 +52,9 @@ macOS and Linux support is planned for future releases.
 
 ## Current Scope
 
-This release provides raw English voice-to-text. AI cleanup, filler-word
-removal, editor insertion, multilingual transcription, and Ollama integration
-are planned for later versions.
+This release provides raw English voice-to-text with optional active-terminal
+insertion. AI cleanup, filler-word removal, editor insertion, multilingual
+transcription, and Ollama integration are planned for later versions.
 
 Found an issue or have an idea? Visit the
 [GitHub repository](https://github.com/IftekharPriyo/vscode-voice-assistant).
