@@ -5,5 +5,5 @@ export interface SpeechRecognitionState {
   readonly isError: boolean;
   readonly canStart: boolean;
   readonly canStop: boolean;
-  readonly sendToCodex: boolean;
+  readonly sendToActiveTerminal: boolean;
 }

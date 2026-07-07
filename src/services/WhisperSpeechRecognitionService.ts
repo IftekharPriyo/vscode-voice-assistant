@@ -3,7 +3,7 @@ import { mkdir, readFile, rm } from 'node:fs/promises';
 import * as path from 'node:path';
 import * as vscode from 'vscode';
 
-import type { CodexTerminalService } from './CodexTerminalService';
+import type { ActiveTerminalService, TerminalSendResult } from './ActiveTerminalService';
 import type { SpeechRecognitionState } from './SpeechRecognitionState';
 import { WhisperRuntimeManager, type WhisperRuntime } from './WhisperRuntimeManager';
 
@@ -14,7 +14,7 @@ const READY_STATE: SpeechRecognitionState = {
   isError: false,
   canStart: true,
   canStop: false,
-  sendToCodex: false,
+  sendToActiveTerminal: false,
 };
 
 export class WhisperSpeechRecognitionService implements vscode.Disposable {
@@ -34,7 +34,7 @@ export class WhisperSpeechRecognitionService implements vscode.Disposable {
   public constructor(
     private readonly storagePath: string,
     private readonly recorderScriptPath: string,
-    private readonly codexTerminal: CodexTerminalService,
+    private readonly activeTerminal: ActiveTerminalService,
   ) {
     this.runtimeManager = new WhisperRuntimeManager(storagePath);
   }
@@ -85,8 +85,8 @@ export class WhisperSpeechRecognitionService implements vscode.Disposable {
     this.updateState({ transcript: '' });
   }
 
-  public setSendToCodex(enabled: boolean): void {
-    this.updateState({ sendToCodex: enabled });
+  public setSendToActiveTerminal(enabled: boolean): void {
+    this.updateState({ sendToActiveTerminal: enabled });
   }
 
   public dispose(): void {
@@ -238,11 +238,11 @@ export class WhisperSpeechRecognitionService implements vscode.Disposable {
       const accumulatedTranscript = transcript
         ? [previousTranscript, transcript].filter(Boolean).join('\n\n')
         : previousTranscript;
-      const sentToCodex = transcript && this.state.sendToCodex
-        ? await this.codexTerminal.sendToActiveCodexTerminal(transcript)
-        : false;
+      const terminalSendResult = transcript && this.state.sendToActiveTerminal
+        ? this.activeTerminal.sendToActiveTerminal(transcript)
+        : undefined;
       this.updateState({
-        status: getCompletionStatus(transcript, sentToCodex),
+        status: getCompletionStatus(transcript, terminalSendResult),
         transcript: accumulatedTranscript,
         audioLevel: 0,
         isError: false,
@@ -307,12 +307,21 @@ function normalizeAudioLevel(rawLevel: number): number {
   return Math.min(1, Math.sqrt(adjustedLevel / 1800));
 }
 
-function getCompletionStatus(transcript: string, sentToCodex: boolean): string {
+function getCompletionStatus(
+  transcript: string,
+  terminalSendResult: TerminalSendResult | undefined,
+): string {
   if (!transcript) {
     return 'No speech recognized.';
   }
 
-  return sentToCodex
-    ? 'Transcription complete. Sent to active Codex CLI.'
-    : 'Transcription complete.';
+  if (terminalSendResult === 'sent') {
+    return 'Transcription complete. Inserted into active terminal.';
+  }
+
+  if (terminalSendResult === 'no-active-terminal') {
+    return 'Transcription complete. No active terminal found.';
+  }
+
+  return 'Transcription complete.';
 }

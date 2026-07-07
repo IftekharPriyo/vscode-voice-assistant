@@ -206,7 +206,7 @@ export function getWebviewContent(): string {
       white-space: pre-wrap;
       word-break: break-word;
     }
-    .codex-toggle {
+    .terminal-toggle {
       display: flex;
       align-items: center;
       gap: 0.45rem;
@@ -217,13 +217,13 @@ export function getWebviewContent(): string {
       font-size: 0.82rem;
       user-select: none;
     }
-    .codex-toggle input {
+    .terminal-toggle input {
       width: 0.95rem;
       height: 0.95rem;
       margin: 0;
       accent-color: var(--vscode-button-background);
     }
-    .codex-toggle:focus-within {
+    .terminal-toggle:focus-within {
       color: var(--vscode-foreground);
     }
     .error {
@@ -268,9 +268,9 @@ export function getWebviewContent(): string {
         </div>
       </div>
       <p id="transcript" aria-live="polite">Your raw speech will appear here.</p>
-      <label class="codex-toggle">
-        <input id="send-to-codex" type="checkbox">
-        <span>Send to Codex CLI when active</span>
+      <label class="terminal-toggle">
+        <input id="send-to-active-terminal" type="checkbox">
+        <span>Insert into active terminal</span>
       </label>
     </section>
   </main>
@@ -282,7 +282,7 @@ export function getWebviewContent(): string {
     const recordControl = document.getElementById('record-control');
     const resetTranscript = document.getElementById('reset-transcript');
     const copyTranscript = document.getElementById('copy-transcript');
-    const sendToCodex = document.getElementById('send-to-codex');
+    const sendToActiveTerminal = document.getElementById('send-to-active-terminal');
     const microphoneIcon = document.getElementById('microphone-icon');
     const pauseIcon = document.getElementById('pause-icon');
     let action = 'start';
@@ -310,10 +310,10 @@ export function getWebviewContent(): string {
       vscode.postMessage({ type: 'command', command: 'copy' });
     });
 
-    sendToCodex.addEventListener('change', () => {
+    sendToActiveTerminal.addEventListener('change', () => {
       vscode.postMessage({
-        type: 'setSendToCodex',
-        enabled: sendToCodex.checked,
+        type: 'setSendToActiveTerminal',
+        enabled: sendToActiveTerminal.checked,
       });
     });
 
@@ -364,8 +364,8 @@ export function getWebviewContent(): string {
         resetTranscript.disabled = !hasTranscript;
       }
 
-      if (typeof event.data.sendToCodex === 'boolean') {
-        sendToCodex.checked = event.data.sendToCodex;
+      if (typeof event.data.sendToActiveTerminal === 'boolean') {
+        sendToActiveTerminal.checked = event.data.sendToActiveTerminal;
       }
     });
 

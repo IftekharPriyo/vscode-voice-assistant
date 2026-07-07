@@ -12,7 +12,7 @@ type WebviewMessage =
       readonly command: 'start' | 'stop' | 'reset' | 'copy';
     }
   | {
-      readonly type: 'setSendToCodex';
+      readonly type: 'setSendToActiveTerminal';
       readonly enabled: boolean;
     };
 
@@ -28,7 +28,7 @@ export class VoiceAssistantViewProvider
     isError: false,
     canStart: true,
     canStop: false,
-    sendToCodex: false,
+    sendToActiveTerminal: false,
   };
   private readonly disposables: vscode.Disposable[] = [];
 
@@ -63,7 +63,7 @@ export class VoiceAssistantViewProvider
         }
 
         await vscode.commands.executeCommand(
-          COMMAND_IDS.setSendToCodex,
+          COMMAND_IDS.setSendToActiveTerminal,
           webviewMessage.enabled,
         );
       },
@@ -132,10 +132,10 @@ function parseMessage(message: unknown): WebviewMessage | undefined {
   }
 
   if (
-    candidate.type === 'setSendToCodex' &&
+    candidate.type === 'setSendToActiveTerminal' &&
     typeof candidate.enabled === 'boolean'
   ) {
-    return { type: 'setSendToCodex', enabled: candidate.enabled };
+    return { type: 'setSendToActiveTerminal', enabled: candidate.enabled };
   }
 
   return undefined;

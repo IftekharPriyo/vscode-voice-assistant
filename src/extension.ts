@@ -2,7 +2,7 @@ import * as vscode from 'vscode';
 
 import { registerCommands } from './commands/registerCommands';
 import { VIEW_IDS } from './config/viewIds';
-import { CodexTerminalService } from './services/CodexTerminalService';
+import { ActiveTerminalService } from './services/ActiveTerminalService';
 import { WhisperSpeechRecognitionService } from './services/WhisperSpeechRecognitionService';
 import { createStatusBarItem } from './ui/statusBar';
 import { VoiceAssistantViewProvider } from './webview/VoiceAssistantViewProvider';
@@ -16,11 +16,11 @@ export function activate(context: vscode.ExtensionContext): void {
   );
   // VS Code webviews deny getUserMedia microphone permission, so recording is
   // performed by the extension host and transcription runs locally with Whisper.
-  const codexTerminal = new CodexTerminalService();
+  const activeTerminal = new ActiveTerminalService();
   const speechRecognition = new WhisperSpeechRecognitionService(
     context.globalStorageUri.fsPath,
     context.asAbsolutePath('resources/windowsAudioRecorder.ps1'),
-    codexTerminal,
+    activeTerminal,
   );
   const commands = registerCommands(viewProvider, speechRecognition);
   const statusBarItem = createStatusBarItem();

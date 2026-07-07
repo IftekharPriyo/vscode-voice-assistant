@@ -31,8 +31,8 @@ export function registerCommands(
       await vscode.env.clipboard.writeText(transcript);
       await vscode.window.showInformationMessage('Voice Assistant transcript copied.');
     }),
-    vscode.commands.registerCommand(COMMAND_IDS.setSendToCodex, (enabled: unknown) => {
-      speechRecognition.setSendToCodex(enabled === true);
+    vscode.commands.registerCommand(COMMAND_IDS.setSendToActiveTerminal, (enabled: unknown) => {
+      speechRecognition.setSendToActiveTerminal(enabled === true);
     }),
   ];
 }
