@@ -4,4 +4,5 @@ export const COMMAND_IDS = {
   stopRecording: 'voiceAssistant.stopRecording',
   resetTranscript: 'voiceAssistant.resetTranscript',
   copyTranscript: 'voiceAssistant.copyTranscript',
+  setSendToActiveTerminal: 'voiceAssistant.setSendToActiveTerminal',
 } as const;

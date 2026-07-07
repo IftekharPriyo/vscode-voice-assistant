@@ -206,6 +206,26 @@ export function getWebviewContent(): string {
       white-space: pre-wrap;
       word-break: break-word;
     }
+    .terminal-toggle {
+      display: flex;
+      align-items: center;
+      gap: 0.45rem;
+      margin-top: 0.65rem;
+      padding-top: 0.6rem;
+      color: var(--vscode-descriptionForeground);
+      border-top: 1px solid var(--vscode-panel-border);
+      font-size: 0.82rem;
+      user-select: none;
+    }
+    .terminal-toggle input {
+      width: 0.95rem;
+      height: 0.95rem;
+      margin: 0;
+      accent-color: var(--vscode-button-background);
+    }
+    .terminal-toggle:focus-within {
+      color: var(--vscode-foreground);
+    }
     .error {
       color: var(--vscode-errorForeground);
     }
@@ -248,6 +268,10 @@ export function getWebviewContent(): string {
         </div>
       </div>
       <p id="transcript" aria-live="polite">Your raw speech will appear here.</p>
+      <label class="terminal-toggle">
+        <input id="send-to-active-terminal" type="checkbox">
+        <span>Insert into active terminal</span>
+      </label>
     </section>
   </main>
   <script nonce="${nonce}">
@@ -258,6 +282,7 @@ export function getWebviewContent(): string {
     const recordControl = document.getElementById('record-control');
     const resetTranscript = document.getElementById('reset-transcript');
     const copyTranscript = document.getElementById('copy-transcript');
+    const sendToActiveTerminal = document.getElementById('send-to-active-terminal');
     const microphoneIcon = document.getElementById('microphone-icon');
     const pauseIcon = document.getElementById('pause-icon');
     let action = 'start';
@@ -283,6 +308,13 @@ export function getWebviewContent(): string {
 
     copyTranscript.addEventListener('click', () => {
       vscode.postMessage({ type: 'command', command: 'copy' });
+    });
+
+    sendToActiveTerminal.addEventListener('change', () => {
+      vscode.postMessage({
+        type: 'setSendToActiveTerminal',
+        enabled: sendToActiveTerminal.checked,
+      });
     });
 
     function showRecordingIcon(isRecording) {
@@ -330,6 +362,10 @@ export function getWebviewContent(): string {
           event.data.transcript || 'Your raw speech will appear here.';
         copyTranscript.disabled = !hasTranscript;
         resetTranscript.disabled = !hasTranscript;
+      }
+
+      if (typeof event.data.sendToActiveTerminal === 'boolean') {
+        sendToActiveTerminal.checked = event.data.sendToActiveTerminal;
       }
     });
 

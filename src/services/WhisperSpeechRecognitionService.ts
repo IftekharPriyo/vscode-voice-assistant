@@ -3,6 +3,7 @@ import { mkdir, readFile, rm } from 'node:fs/promises';
 import * as path from 'node:path';
 import * as vscode from 'vscode';
 
+import type { ActiveTerminalService, TerminalSendResult } from './ActiveTerminalService';
 import type { SpeechRecognitionState } from './SpeechRecognitionState';
 import { WhisperRuntimeManager, type WhisperRuntime } from './WhisperRuntimeManager';
 
@@ -13,6 +14,7 @@ const READY_STATE: SpeechRecognitionState = {
   isError: false,
   canStart: true,
   canStop: false,
+  sendToActiveTerminal: false,
 };
 
 export class WhisperSpeechRecognitionService implements vscode.Disposable {
@@ -32,6 +34,7 @@ export class WhisperSpeechRecognitionService implements vscode.Disposable {
   public constructor(
     private readonly storagePath: string,
     private readonly recorderScriptPath: string,
+    private readonly activeTerminal: ActiveTerminalService,
   ) {
     this.runtimeManager = new WhisperRuntimeManager(storagePath);
   }
@@ -80,6 +83,10 @@ export class WhisperSpeechRecognitionService implements vscode.Disposable {
 
   public resetTranscript(): void {
     this.updateState({ transcript: '' });
+  }
+
+  public setSendToActiveTerminal(enabled: boolean): void {
+    this.updateState({ sendToActiveTerminal: enabled });
   }
 
   public dispose(): void {
@@ -231,8 +238,11 @@ export class WhisperSpeechRecognitionService implements vscode.Disposable {
       const accumulatedTranscript = transcript
         ? [previousTranscript, transcript].filter(Boolean).join('\n\n')
         : previousTranscript;
+      const terminalSendResult = transcript && this.state.sendToActiveTerminal
+        ? this.activeTerminal.sendToActiveTerminal(transcript)
+        : undefined;
       this.updateState({
-        status: transcript ? 'Transcription complete.' : 'No speech recognized.',
+        status: getCompletionStatus(transcript, terminalSendResult),
         transcript: accumulatedTranscript,
         audioLevel: 0,
         isError: false,
@@ -295,4 +305,23 @@ function normalizeAudioLevel(rawLevel: number): number {
   // without making quiet room noise dominate the animation.
   const adjustedLevel = Math.max(0, Math.abs(rawLevel) - 12);
   return Math.min(1, Math.sqrt(adjustedLevel / 1800));
+}
+
+function getCompletionStatus(
+  transcript: string,
+  terminalSendResult: TerminalSendResult | undefined,
+): string {
+  if (!transcript) {
+    return 'No speech recognized.';
+  }
+
+  if (terminalSendResult === 'sent') {
+    return 'Transcription complete. Inserted into active terminal.';
+  }
+
+  if (terminalSendResult === 'no-active-terminal') {
+    return 'Transcription complete. No active terminal found.';
+  }
+
+  return 'Transcription complete.';
 }
