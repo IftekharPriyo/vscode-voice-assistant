@@ -14,6 +14,7 @@ const READY_STATE: SpeechRecognitionState = {
   isError: false,
   canStart: true,
   canStop: false,
+  sendToCodex: false,
 };
 
 export class WhisperSpeechRecognitionService implements vscode.Disposable {
@@ -82,6 +83,10 @@ export class WhisperSpeechRecognitionService implements vscode.Disposable {
 
   public resetTranscript(): void {
     this.updateState({ transcript: '' });
+  }
+
+  public setSendToCodex(enabled: boolean): void {
+    this.updateState({ sendToCodex: enabled });
   }
 
   public dispose(): void {
@@ -233,7 +238,7 @@ export class WhisperSpeechRecognitionService implements vscode.Disposable {
       const accumulatedTranscript = transcript
         ? [previousTranscript, transcript].filter(Boolean).join('\n\n')
         : previousTranscript;
-      const sentToCodex = transcript
+      const sentToCodex = transcript && this.state.sendToCodex
         ? await this.codexTerminal.sendToActiveCodexTerminal(transcript)
         : false;
       this.updateState({

@@ -206,6 +206,26 @@ export function getWebviewContent(): string {
       white-space: pre-wrap;
       word-break: break-word;
     }
+    .codex-toggle {
+      display: flex;
+      align-items: center;
+      gap: 0.45rem;
+      margin-top: 0.65rem;
+      padding-top: 0.6rem;
+      color: var(--vscode-descriptionForeground);
+      border-top: 1px solid var(--vscode-panel-border);
+      font-size: 0.82rem;
+      user-select: none;
+    }
+    .codex-toggle input {
+      width: 0.95rem;
+      height: 0.95rem;
+      margin: 0;
+      accent-color: var(--vscode-button-background);
+    }
+    .codex-toggle:focus-within {
+      color: var(--vscode-foreground);
+    }
     .error {
       color: var(--vscode-errorForeground);
     }
@@ -248,6 +268,10 @@ export function getWebviewContent(): string {
         </div>
       </div>
       <p id="transcript" aria-live="polite">Your raw speech will appear here.</p>
+      <label class="codex-toggle">
+        <input id="send-to-codex" type="checkbox">
+        <span>Send to Codex CLI when active</span>
+      </label>
     </section>
   </main>
   <script nonce="${nonce}">
@@ -258,6 +282,7 @@ export function getWebviewContent(): string {
     const recordControl = document.getElementById('record-control');
     const resetTranscript = document.getElementById('reset-transcript');
     const copyTranscript = document.getElementById('copy-transcript');
+    const sendToCodex = document.getElementById('send-to-codex');
     const microphoneIcon = document.getElementById('microphone-icon');
     const pauseIcon = document.getElementById('pause-icon');
     let action = 'start';
@@ -283,6 +308,13 @@ export function getWebviewContent(): string {
 
     copyTranscript.addEventListener('click', () => {
       vscode.postMessage({ type: 'command', command: 'copy' });
+    });
+
+    sendToCodex.addEventListener('change', () => {
+      vscode.postMessage({
+        type: 'setSendToCodex',
+        enabled: sendToCodex.checked,
+      });
     });
 
     function showRecordingIcon(isRecording) {
@@ -330,6 +362,10 @@ export function getWebviewContent(): string {
           event.data.transcript || 'Your raw speech will appear here.';
         copyTranscript.disabled = !hasTranscript;
         resetTranscript.disabled = !hasTranscript;
+      }
+
+      if (typeof event.data.sendToCodex === 'boolean') {
+        sendToCodex.checked = event.data.sendToCodex;
       }
     });
 
