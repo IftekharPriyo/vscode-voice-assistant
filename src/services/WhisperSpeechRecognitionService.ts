@@ -3,6 +3,7 @@ import { mkdir, readFile, rm } from 'node:fs/promises';
 import * as path from 'node:path';
 import * as vscode from 'vscode';
 
+import type { CodexTerminalService } from './CodexTerminalService';
 import type { SpeechRecognitionState } from './SpeechRecognitionState';
 import { WhisperRuntimeManager, type WhisperRuntime } from './WhisperRuntimeManager';
 
@@ -32,6 +33,7 @@ export class WhisperSpeechRecognitionService implements vscode.Disposable {
   public constructor(
     private readonly storagePath: string,
     private readonly recorderScriptPath: string,
+    private readonly codexTerminal: CodexTerminalService,
   ) {
     this.runtimeManager = new WhisperRuntimeManager(storagePath);
   }
@@ -231,8 +233,11 @@ export class WhisperSpeechRecognitionService implements vscode.Disposable {
       const accumulatedTranscript = transcript
         ? [previousTranscript, transcript].filter(Boolean).join('\n\n')
         : previousTranscript;
+      const sentToCodex = transcript
+        ? await this.codexTerminal.sendToActiveCodexTerminal(transcript)
+        : false;
       this.updateState({
-        status: transcript ? 'Transcription complete.' : 'No speech recognized.',
+        status: getCompletionStatus(transcript, sentToCodex),
         transcript: accumulatedTranscript,
         audioLevel: 0,
         isError: false,
@@ -295,4 +300,14 @@ function normalizeAudioLevel(rawLevel: number): number {
   // without making quiet room noise dominate the animation.
   const adjustedLevel = Math.max(0, Math.abs(rawLevel) - 12);
   return Math.min(1, Math.sqrt(adjustedLevel / 1800));
+}
+
+function getCompletionStatus(transcript: string, sentToCodex: boolean): string {
+  if (!transcript) {
+    return 'No speech recognized.';
+  }
+
+  return sentToCodex
+    ? 'Transcription complete. Sent to active Codex CLI.'
+    : 'Transcription complete.';
 }
